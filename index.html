@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformador de Tabela Excel/CSV</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .file-input-container {
+            margin-bottom: 20px;
+        }
+        #file-info {
+            margin-top: 5px;
+            color: #666;
+        }
+        .hide {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Transformador de Tabela Excel/CSV</h1>
+    
+    <div class="container">
+        <h2>1. Importar Arquivo Excel ou CSV</h2>
+        <div class="file-input-container">
+            <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
+            <div id="file-info">Selecione um arquivo Excel (.xlsx, .xls) ou CSV</div>
+        </div>
+    </div>
+    
+    <div class="container" id="originalDataContainer">
+        <h2>2. Dados Originais</h2>
+        <div id="tableContainer"></div>
+        <textarea id="originalData" placeholder="Os dados originais aparecerão aqui..." readonly></textarea>
+        <button id="transformBtn">Transformar Dados</button>
+    </div>
+    
+    <div class="container hide" id="transformedDataContainer">
+        <h2>3. Dados Transformados</h2>
+        <div id="transformedTableContainer"></div>
+        <textarea id="transformedData" placeholder="Os dados transformados aparecerão aqui..." readonly></textarea>
+        <button id="downloadBtn">Baixar como CSV</button>
+        <button id="backBtn">Voltar</button>
+    </div>
+
+    <!-- Carregar bibliotecas necessárias -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <script>
+        // Elementos da página
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('file-info');
+        const originalData = document.getElementById('originalData');
+        const tableContainer = document.getElementById('tableContainer');
+        const transformBtn = document.getElementById('transformBtn');
+        const transformedData = document.getElementById('transformedData');
+        const transformedTableContainer = document.getElementById('transformedTableContainer');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const backBtn = document.getElementById('backBtn');
+        const originalDataContainer = document.getElementById('originalDataContainer');
+        const transformedDataContainer = document.getElementById('transformedDataContainer');
+
+        // Armazenar dados
+        let workbookData = [];
+        let csvContent = '';
+        let transformedContent = '';
+
+        // Manipular arquivos selecionados
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            fileInfo.textContent = `Arquivo selecionado: ${file.name}`;
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(event) {
+                const data = new Uint8Array(event.target.result);
+                processExcelData(data);
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Processar dados do Excel/CSV
+        function processExcelData(data) {
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+              // Converter para array de objetos
+            const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            // Verificar se temos pelo menos cabeçalho e uma linha
+            if (rawData.length < 2) {
+                alert('O arquivo não contém dados suficientes.');
+                return;
+            }
+
+            // Encontrar índices das colunas desejadas
+            const headers = rawData[0].map(h => String(h).toLowerCase());
+            const nameIndex = headers.findIndex(h => h.includes('nome'));
+            const turmaIndex = headers.findIndex(h => h.includes('turma'));
+            const matriculaIndex = headers.findIndex(h => h.includes('matrícula') || h.includes('matricula'));
+
+            if (nameIndex === -1 || turmaIndex === -1 || matriculaIndex === -1) {
+                alert('O arquivo deve conter colunas para Nome, Turma e Matrícula.');
+                return;
+            }
+
+            // Filtrar apenas as colunas desejadas
+            workbookData = rawData.map(row => [
+                row[nameIndex],
+                row[turmaIndex],
+                row[matriculaIndex]
+            ]);
+
+            // Criar CSV do conteúdo original
+            csvContent = convertToCSV(workbookData);
+            originalData.value = csvContent;
+
+            // Criar tabela visual
+            createTable(workbookData, tableContainer);
+        }
+
+        // Converter array para formato CSV
+        function convertToCSV(data) {
+            return data.map(row => row.join(';')).join('\n');
+        }
+
+        // Criar tabela HTML para visualização
+        function createTable(data, container) {
+            if (!data || data.length === 0) return;
+
+            const table = document.createElement('table');
+            
+            // Criar cabeçalho
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            
+            data[0].forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // Criar corpo da tabela
+            const tbody = document.createElement('tbody');
+            
+            for (let i = 1; i < data.length; i++) {
+                const row = document.createElement('tr');
+                
+                data[i].forEach(cell => {
+                    const td = document.createElement('td');
+                    td.textContent = cell;
+                    row.appendChild(td);
+                });
+                
+                tbody.appendChild(row);
+            }
+            
+            table.appendChild(tbody);
+            container.innerHTML = '';
+            container.appendChild(table);
+        }
+
+        // Transformar dados
+        transformBtn.addEventListener('click', function() {
+            if (!workbookData || workbookData.length < 2) {
+                alert('Por favor, carregue um arquivo válido primeiro.');
+                return;
+            }            // Como já filtramos as colunas, agora sabemos que:
+            // índice 0 = Nome
+            // índice 1 = Turma
+            // índice 2 = Matrícula
+            const nameIndex = 0;
+            const turmaIndex = 1;
+            const matriculaIndex = 2;
+
+            // Criar dados transformados
+            const transformedHeaders = ['username', 'firstname', 'lastname', 'email', 'cohort1'];
+            const transformedRows = [transformedHeaders];
+
+            for (let i = 1; i < workbookData.length; i++) {
+                const row = workbookData[i];
+                if (row.length <= Math.max(nameIndex, turmaIndex, matriculaIndex)) continue;                const fullName = String(row[nameIndex] || '').trim();
+                const turmaValue = String(row[turmaIndex] || '').toLowerCase().trim();
+                const matricula = String(row[matriculaIndex] || '').trim();
+                
+                // Validar dados
+                if (!fullName || !turmaValue || !matricula) {
+                    console.warn(`Linha ${i} ignorada por dados incompletos`);
+                    continue;
+                }
+
+                // Separar nome
+                const nameParts = fullName.split(' ');
+                const firstName = nameParts[0];
+                const lastName = nameParts.slice(1).join(' ');
+
+                // Criar email
+                const email = `${matricula}@example123.com`;                // Criar cohort
+                const cohort = `turma_${turmaValue}`;
+
+                // Adicionar linha transformada
+                transformedRows.push([matricula, firstName, lastName, email, cohort]);
+            }
+
+            // Atualizar conteúdo transformado
+            transformedContent = transformedRows.map(row => row.join(';')).join('\n');
+            transformedData.value = transformedContent;
+
+            // Atualizar tabela visual
+            createTable(transformedRows, transformedTableContainer);
+
+            // Mostrar container de dados transformados, esconder o original
+            originalDataContainer.classList.add('hide');
+            transformedDataContainer.classList.remove('hide');
+        });
+
+        // Voltar para dados originais
+        backBtn.addEventListener('click', function() {
+            transformedDataContainer.classList.add('hide');
+            originalDataContainer.classList.remove('hide');
+        });
+
+        // Baixar como CSV
+        downloadBtn.addEventListener('click', function() {
+            if (!transformedContent) {
+                alert('Não há dados transformados para baixar.');
+                return;
+            }
+
+            const blob = new Blob([transformedContent], {type: 'text/csv;charset=utf-8;'});
+            saveAs(blob, 'dados_transformados.csv');
+        });
+    </script>
+</body>
+</html>
