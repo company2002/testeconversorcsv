@@ -160,9 +160,9 @@
 
             // Encontrar índices das colunas desejadas
             const headers = rawData[0].map(h => String(h).toLowerCase());
-            const nameIndex = headers.findIndex(h => h.includes('nome'));
+            const nameIndex = headers.findIndex(h => h.includes('nome')|| h.includes('nome completo'));
             const turmaIndex = headers.findIndex(h => h.includes('turma'));
-            const matriculaIndex = headers.findIndex(h => h.includes('matrícula') || h.includes('matricula'));
+            const matriculaIndex = headers.findIndex(h => h.includes('matrícula') || h.includes('matricula') || h.includes('matricula esap') || h.includes('matrícula esap'));
 
             if (nameIndex === -1 || turmaIndex === -1 || matriculaIndex === -1) {
                 alert('O arquivo deve conter colunas para Nome, Turma e Matrícula.');
